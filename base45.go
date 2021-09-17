@@ -7,9 +7,9 @@ import (
 )
 
 const (
-	Base       = 45
-	BaseSquare = 45 * 45
-	MaxUint16  = 0xFFFF
+	base       = 45
+	baseSquare = 45 * 45
+	maxUint16  = 0xFFFF
 )
 
 type InvalidLengthError struct {
@@ -287,9 +287,9 @@ func encodePairs(in []byte) [][]byte {
 
 func encodeBase45(in []byte) []byte {
 	n := binary.BigEndian.Uint16(in)
-	c := n % Base
-	e := (n - c) / (BaseSquare)
-	d := (n - (c + (e * BaseSquare))) / Base
+	c := n % base
+	e := (n - c) / (baseSquare)
+	d := (n - (c + (e * baseSquare))) / base
 	if in[0] == 0 {
 		return []byte{byte(c), byte(d)}
 	}
@@ -305,8 +305,8 @@ func decodeTriplets(in [][]byte) ([]uint16, error) {
 			c := int(chunk[0])
 			d := int(chunk[1])
 			e := int(chunk[2])
-			n := c + (d * Base) + (e * BaseSquare)
-			if n > MaxUint16 {
+			n := c + (d * base) + (e * baseSquare)
+			if n > maxUint16 {
 				return nil, IllegalBase45ByteError{position: pos}
 			}
 			ret = append(ret, uint16(n))
@@ -315,7 +315,7 @@ func decodeTriplets(in [][]byte) ([]uint16, error) {
 			// n = c + (d*45)
 			c := int(chunk[0])
 			d := int(chunk[1])
-			n := c + (d * Base)
+			n := c + (d * base)
 			ret = append(ret, uint16(n))
 		}
 	}
