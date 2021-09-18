@@ -192,11 +192,19 @@ func Encode(in string) string {
 	bytes := []byte(in)
 	pairs := encodePairs(bytes)
 	var builder strings.Builder
-	for _, pair := range pairs {
+	for i, pair := range pairs {
 		res := encodeBase45(pair)
-		for _, b := range res {
-			if c, ok := encodingMap[b]; ok {
-				builder.WriteRune(c)
+		if i + 1 == len(pairs) && res[2] == 0 {
+			for _, b := range res[:2] {
+				if c, ok := encodingMap[b]; ok {
+					builder.WriteRune(c)
+				}
+			}
+		} else {
+			for _, b := range res {
+				if c, ok := encodingMap[b]; ok {
+					builder.WriteRune(c)
+				}
 			}
 		}
 	}
@@ -212,10 +220,11 @@ func Encode(in string) string {
 //   at the ASCII values we get the string "ietf!".
 func Decode(in string) (string, error) {
 	size := len(in)
-	if size % 3 != 0 && size % 3 != 2 {
+	mod := size % 3
+	if mod != 0 && mod != 2 {
 		return "", InvalidLengthError{
 			length: size,
-			mod:    size % 3,
+			mod:    mod,
 		}
 	}
 	bytes := make([]byte, 0, size)
@@ -234,14 +243,22 @@ func Decode(in string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	tripletBytes := decodeTripletBytes(triplets)
-	var builder strings.Builder
-	for _, bytes := range tripletBytes {
-		for _, b := range bytes {
-			builder.WriteByte(b)
-		}
+	tripletsLength := len(triplets)
+	decoded := make([]byte, 0, tripletsLength * 2)
+	for i := 0; i < tripletsLength - 1; i++ {
+		bytes := uint16ToBytes(triplets[i])
+		decoded = append(decoded, bytes[0])
+		decoded = append(decoded, bytes[1])
 	}
-	return builder.String(), nil
+	if mod == 2 {
+		bytes := uint16ToBytes(triplets[tripletsLength - 1])
+		decoded = append(decoded, bytes[1])
+	} else {
+		bytes := uint16ToBytes(triplets[tripletsLength - 1])
+		decoded = append(decoded, bytes[0])
+		decoded = append(decoded, bytes[1])
+	}
+	return string(decoded), nil
 }
 
 func uint16ToBytes(in uint16) []byte {
@@ -290,9 +307,6 @@ func encodeBase45(in []byte) []byte {
 	c := n % base
 	e := (n - c) / (baseSquare)
 	d := (n - (c + (e * baseSquare))) / base
-	if in[0] == 0 {
-		return []byte{byte(c), byte(d)}
-	}
 	return []byte{byte(c), byte(d), byte(e)}
 }
 
@@ -313,24 +327,11 @@ func decodeTriplets(in [][]byte) ([]uint16, error) {
 		}
 		if len(chunk) == 2 {
 			// n = c + (d*45)
-			c := int(chunk[0])
-			d := int(chunk[1])
+			c := uint16(chunk[0])
+			d := uint16(chunk[1])
 			n := c + (d * base)
-			ret = append(ret, uint16(n))
+			ret = append(ret, n)
 		}
 	}
 	return ret, nil
-}
-
-func decodeTripletBytes(in []uint16) [][]byte {
-	ret := make([][]byte, 0)
-	for _, n := range in {
-		bytes := uint16ToBytes(n)
-		if bytes[0] == 0 {
-			ret = append(ret, []byte{bytes[1]})
-		} else {
-			ret = append(ret, bytes)
-		}
-	}
-	return ret
 }
